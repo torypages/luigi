@@ -136,6 +136,7 @@ class RemoteFileSystem(luigi.target.FileSystem):
 
 
     def put(self, local_path, path):
+        # TODO NEED TO TEST, RUN
         # create parent folder if not exists
         self._connect()
 
@@ -143,35 +144,47 @@ class RemoteFileSystem(luigi.target.FileSystem):
         folder = os.path.dirname(normpath)
 
         # create paths if do not exists
+        print('folder', folder)
         for subfolder in folder.split(os.sep):
-            if subfolder and subfolder not in self.ftpcon.nlst():
-                self.ftpcon.mkd(subfolder)
+            if subfolder:
+                try:
+                    self.sftpcon.stat(subfolder)
+                except IOError:
+                    print('mkdir', subfolder)
+                    self.sftpcon.mkdir(subfolder)
 
-            self.ftpcon.cwd(subfolder)
+            # print('chdir', subfolder)
+            # self.sftpcon.chdir(subfolder)
 
         # go back to ftp root folder
-        self.ftpcon.cwd("/")
+        # self.sftpcon.path()
 
         # random file name
+        # TODO should check to make sure this doesn't exist first.
         tmp_path = folder + os.sep + 'luigi-tmp-%09d' % random.randrange(0, 1e10)
 
-        self.ftpcon.storbinary('STOR %s' % tmp_path, open(local_path, 'rb'))
-        self.ftpcon.rename(tmp_path, normpath)
+        print('local_path', local_path)
+        print('tmp_path', tmp_path)
+        self.sftpcon.put(local_path, tmp_path)
+        self.sftpcon.rename(tmp_path, normpath)
 
-        self.ftpcon.quit()
+        # TODO
+        # self.ftpcon.quit()
 
     def get(self, path, local_path):
+        # TODO CURRENTLY WORKING HERE
         # Create folder if it does not exist
         normpath = os.path.normpath(local_path)
         folder = os.path.dirname(normpath)
         if folder and not os.path.exists(folder):
             os.makedirs(folder)
 
+        # TODO use a proper temp file.
         tmp_local_path = local_path + '-luigi-tmp-%09d' % random.randrange(0, 1e10)
         # download file
         self._connect()
-        self.ftpcon.retrbinary('RETR %s' % path, open(tmp_local_path, 'wb').write)
-        self.ftpcon.quit()
+        self.sftpcon.get(path, tmp_local_path)
+        # self.ftpcon.quit()
 
         os.rename(tmp_local_path, local_path)
 
